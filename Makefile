@@ -12,13 +12,13 @@
 
 # Makefile for VXLAN Implementation
 
-CC = gcc
-CFLAGS =  -Wall -Wextra -I./include -pthread 
+CC      = gcc
+CFLAGS  =  -Wall -Wextra -I./include -pthread 
 LDFLAGS = -pthread
 
 # Source files
-SRC_DIR = src
-INC_DIR = include
+SRC_DIR  = src
+INC_DIR  = include
 TEST_DIR = test
 
 SOURCES = $(SRC_DIR)/vxlan_encap.c \
