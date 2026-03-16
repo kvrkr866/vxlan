@@ -11,6 +11,7 @@
  *                Wraps inner Ethernet frames in VXLAN+UDP+IP+Ethernet headers
  *****************************************************************************/
 
+#include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include "../include/vxlan.h"
@@ -118,6 +119,10 @@ static void build_eth_header(eth_hdr_t *eth_hdr,
  * Main encapsulation function
  * 
  * Wraps inner Ethernet frame in VXLAN+UDP+IP+Ethernet
+ * 
+ * RFC 7348 Section 6.1:
+ * "When a VLAN-tagged packet is a candidate for VXLAN tunneling, the
+ *  encapsulating VTEP SHOULD strip the VLAN tag unless configured otherwise."
  */
 int vxlan_encapsulate(vxlan_ctx_t *ctx,
                       const uint8_t *inner_frame,
@@ -135,12 +140,33 @@ int vxlan_encapsulate(vxlan_ctx_t *ctx,
         return -1;
     }
     
+    /* RFC 7348 Section 6.1: Strip VLAN tag if present (unless configured otherwise) */
+    uint8_t processed_frame[ETH_DATA_LEN];
+    const uint8_t *frame_to_encap = inner_frame;
+    size_t frame_len_to_encap = inner_len;
+    
+    if (ctx->vlan_config.strip_on_encap && vxlan_vlan_is_tagged(inner_frame, inner_len)) {
+        uint16_t vlan_id;
+        if (vxlan_vlan_get_id(inner_frame, &vlan_id) == 0) {
+            printf("Stripping VLAN tag (VLAN %u) before encapsulation per RFC 7348\n", vlan_id);
+        }
+        
+        size_t stripped_len;
+        if (vxlan_vlan_strip(inner_frame, inner_len, 
+                            processed_frame, &stripped_len) == 0) {
+            frame_to_encap = processed_frame;
+            frame_len_to_encap = stripped_len;
+        } else {
+            fprintf(stderr, "Warning: Failed to strip VLAN tag, encapsulating as-is\n");
+        }
+    }
+    
     /* Calculate total outer packet size */
     size_t total_len = sizeof(eth_hdr_t) +      /* Outer Ethernet */
                        sizeof(ip_hdr_t) +        /* Outer IP */
                        sizeof(udp_hdr_t) +       /* Outer UDP */
                        sizeof(vxlan_hdr_t) +     /* VXLAN header */
-                       inner_len;                /* Inner frame */
+                       frame_len_to_encap;       /* Inner frame (possibly stripped) */
     
     if (total_len > 9000) { /* Jumbo frame check */
         return -1;
@@ -161,14 +187,14 @@ int vxlan_encapsulate(vxlan_ctx_t *ctx,
     /* 2. Outer IP Header */
     ip_hdr_t *outer_ip = (ip_hdr_t *)(pkt + offset);
     uint16_t ip_total_len = sizeof(ip_hdr_t) + sizeof(udp_hdr_t) + 
-                            sizeof(vxlan_hdr_t) + inner_len;
+                            sizeof(vxlan_hdr_t) + frame_len_to_encap;
     build_ip_header(outer_ip, ctx->vtep.local_ip, dst_vtep_ip, ip_total_len);
     offset += sizeof(ip_hdr_t);
     
     /* 3. Outer UDP Header */
     udp_hdr_t *outer_udp = (udp_hdr_t *)(pkt + offset);
-    uint16_t src_port = vxlan_calc_src_port(inner_frame, inner_len);
-    uint16_t udp_payload_len = sizeof(vxlan_hdr_t) + inner_len;
+    uint16_t src_port = vxlan_calc_src_port(frame_to_encap, frame_len_to_encap);
+    uint16_t udp_payload_len = sizeof(vxlan_hdr_t) + frame_len_to_encap;
     build_udp_header(outer_udp, src_port, ctx->vtep.udp_port, 
                      udp_payload_len, ctx->vtep.checksum_enabled);
     offset += sizeof(udp_hdr_t);
@@ -178,9 +204,9 @@ int vxlan_encapsulate(vxlan_ctx_t *ctx,
     build_vxlan_header(vxlan_hdr, ctx->vtep.vni);
     offset += sizeof(vxlan_hdr_t);
     
-    /* 5. Inner Ethernet Frame (payload) */
-    memcpy(pkt + offset, inner_frame, inner_len);
-    offset += inner_len;
+    /* 5. Inner Ethernet Frame (payload - possibly stripped of VLAN) */
+    memcpy(pkt + offset, frame_to_encap, frame_len_to_encap);
+    offset += frame_len_to_encap;
     
     *outer_len = offset;
     

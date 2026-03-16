@@ -20,7 +20,10 @@
 #include <net/ethernet.h>
 #include <arpa/inet.h>
 
-/* ==================== RFC7348 Protocol Constants ==================== */
+/* VLAN tag handling */
+#include "vxlan_vlan.h"
+
+/* ==================== Protocol Constants ==================== */
 
 #define VXLAN_UDP_PORT          4789    /* IANA assigned port */
 #define VXLAN_HEADER_SIZE       8       /* VXLAN header is 8 bytes */
@@ -136,6 +139,7 @@ typedef struct {
     mac_entry_t  *mac_table[MAC_TABLE_SIZE]; /* MAC learning table */
     pthread_mutex_t mac_lock;       /* Thread safety for MAC table */
     bool          running;          /* Service running flag */
+    vlan_config_t vlan_config;      /* VLAN tag handling configuration */
 } vxlan_ctx_t;
 
 /**

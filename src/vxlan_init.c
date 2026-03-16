@@ -23,8 +23,7 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-
+#include <linux/if.h>
 #include "../include/vxlan.h"
 #include "../include/vxlan_utils.h"
 
@@ -102,6 +101,9 @@ int vxlan_init(vxlan_ctx_t *ctx, uint32_t local_ip, uint32_t vni) {
         perror("pthread_mutex_init");
         return -1;
     }
+    
+    /* Initialize VLAN configuration with RFC 7348 defaults */
+    vxlan_vlan_config_init(&ctx->vlan_config);
     
     /* Create raw socket for packet I/O (optional - for actual network I/O) */
     ctx->vtep.sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);

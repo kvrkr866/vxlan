@@ -284,6 +284,12 @@ int vxlan_decapsulate(vxlan_ctx_t *ctx,
         return -1;
     }
     
+    /* RFC 7348 Section 6.1: Validate inner VLAN tag handling */
+    if (vxlan_vlan_validate(pkt + offset, remaining, &ctx->vlan_config) != 0) {
+        fprintf(stderr, "Inner VLAN validation failed - discarding per RFC 7348\n");
+        return -1; /* Frame has inner VLAN and should be discarded */
+    }
+    
     /* Copy entire inner frame (Ethernet header + payload) */
     *inner_len = remaining;
     

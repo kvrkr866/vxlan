@@ -25,7 +25,8 @@ SOURCES = $(SRC_DIR)/vxlan_encap.c \
           $(SRC_DIR)/vxlan_decap.c \
           $(SRC_DIR)/vxlan_mac_learning.c \
           $(SRC_DIR)/vxlan_utils.c \
-          $(SRC_DIR)/vxlan_init.c
+          $(SRC_DIR)/vxlan_init.c \
+          $(SRC_DIR)/vxlan_vlan.c
 
 OBJECTS = $(SOURCES:.c=.o)
 
@@ -43,10 +44,11 @@ test: vxlan_lib
 	$(CC) $(CFLAGS) $(TEST_DIR)/test_vtep.c -L. -lvxlan $(LDFLAGS)  -o test_vtep
 	$(CC) $(CFLAGS) $(TEST_DIR)/test_vxlan.c -L. -lvxlan $(LDFLAGS) -o test_vxlan
 	$(CC) $(CFLAGS) $(TEST_DIR)/test_udp_checksum.c -L. -lvxlan $(LDFLAGS) -o test_udp_checksum
-	@echo "Built completed for tests --> test_vtep, test_vxlan, test_udp_checksum"
+	$(CC) $(CFLAGS) $(TEST_DIR)/test_vlan.c -L. -lvxlan $(LDFLAGS) -o test_vlan
+	@echo "Built completed for tests --> test_vtep, test_vxlan, test_udp_checksum, test_vlan"
 
 clean:
-	rm -f $(OBJECTS) libvxlan.a test_vtep test_vxlan test_udp_checksum
+	rm -f $(OBJECTS) libvxlan.a test_vtep test_vxlan test_udp_checksum test_vlan
 	@echo "Cleaned build artifacts"
 
 .PHONY: all clean test vxlan_lib
