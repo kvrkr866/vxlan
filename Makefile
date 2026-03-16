@@ -42,10 +42,11 @@ $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 test: vxlan_lib
 	$(CC) $(CFLAGS) $(TEST_DIR)/test_vtep.c -L. -lvxlan $(LDFLAGS)  -o test_vtep
 	$(CC) $(CFLAGS) $(TEST_DIR)/test_vxlan.c -L. -lvxlan $(LDFLAGS) -o test_vxlan
-	@echo "Built completed for tests --> test_vtep, test_vxlan"
+	$(CC) $(CFLAGS) $(TEST_DIR)/test_udp_checksum.c -L. -lvxlan $(LDFLAGS) -o test_udp_checksum
+	@echo "Built completed for tests --> test_vtep, test_vxlan, test_udp_checksum"
 
 clean:
-	rm -f $(OBJECTS) libvxlan.a test_vtep test_vxlan
+	rm -f $(OBJECTS) libvxlan.a test_vtep test_vxlan test_udp_checksum
 	@echo "Cleaned build artifacts"
 
 .PHONY: all clean test vxlan_lib

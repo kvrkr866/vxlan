@@ -52,11 +52,19 @@ static int validate_ip_header(const ip_hdr_t *ip_hdr, size_t remaining_len) {
 }
 
 /**
- * Validate outer UDP header
+ * Validate outer UDP header with checksum verification
+ * 
+ * RFC 7348 Requirements:
+ * - UDP checksum SHOULD be transmitted as zero
+ * - When received with zero checksum, MUST be accepted
+ * - When non-zero, MUST be correctly calculated
+ * - Receiver MAY verify checksum; if verification fails, MUST drop
  */
 static int validate_udp_header(const udp_hdr_t *udp_hdr, 
+                               const ip_hdr_t *ip_hdr,
                                size_t remaining_len, 
-                               uint16_t expected_port) {
+                               uint16_t expected_port,
+                               bool verify_checksum) {
     if (remaining_len < sizeof(udp_hdr_t)) {
         return -1;
     }
@@ -68,14 +76,91 @@ static int validate_udp_header(const udp_hdr_t *udp_hdr,
         return -1;
     }
     
-    /* UDP checksum validation (if non-zero) */
-    if (udp_hdr->checksum != 0) {
-        /* Optional: implement full UDP checksum validation with pseudo-header */
-        /* For now, we accept it as RFC 7348 allows checksum to be 0 */
+    /* RFC 7348: UDP checksum MUST be accepted when zero */
+    if (udp_hdr->checksum == 0) {
+        /* Zero checksum is valid and MUST be accepted */
+        return 0;
     }
     
+    /* RFC 7348: Receiver MAY verify non-zero checksum */
+    if (verify_checksum) {
+        /* Calculate expected checksum with pseudo-header */
+        uint16_t udp_len = ntohs(udp_hdr->length);
+        
+        /* Build pseudo-header for checksum calculation */
+        struct {
+            uint32_t src_ip;
+            uint32_t dst_ip;
+            uint8_t  zero;
+            uint8_t  protocol;
+            uint16_t udp_length;
+        } __attribute__((packed)) pseudo_hdr;
+        
+        pseudo_hdr.src_ip = ip_hdr->src_ip;
+        pseudo_hdr.dst_ip = ip_hdr->dst_ip;
+        pseudo_hdr.zero = 0;
+        pseudo_hdr.protocol = 17; /* UDP */
+        pseudo_hdr.udp_length = udp_hdr->length;
+        
+        /* Calculate checksum over pseudo-header + UDP header + data */
+        uint32_t sum = 0;
+        const uint16_t *ptr;
+        size_t count;
+        
+        /* Add pseudo-header */
+        ptr = (const uint16_t *)&pseudo_hdr;
+        count = sizeof(pseudo_hdr);
+        while (count > 1) {
+            sum += *ptr++;
+            count -= 2;
+        }
+        
+        /* Add UDP header and payload */
+        ptr = (const uint16_t *)udp_hdr;
+        count = udp_len;
+        
+        /* Save original checksum and set to 0 for calculation */
+        uint16_t original_checksum = udp_hdr->checksum;
+        ((udp_hdr_t *)udp_hdr)->checksum = 0;
+        
+        while (count > 1) {
+            sum += *ptr++;
+            count -= 2;
+        }
+        
+        /* Add odd byte if present */
+        if (count > 0) {
+            sum += *(const uint8_t *)ptr;
+        }
+        
+        /* Fold 32-bit sum to 16 bits */
+        while (sum >> 16) {
+            sum = (sum & 0xFFFF) + (sum >> 16);
+        }
+        
+        uint16_t calculated_checksum = ~sum;
+        
+        /* Restore original checksum */
+        ((udp_hdr_t *)udp_hdr)->checksum = original_checksum;
+        
+        /* RFC 7348: If verification fails, packet MUST be dropped */
+        if (calculated_checksum != original_checksum) {
+            fprintf(stderr, "UDP checksum verification FAILED (RFC 7348 violation):\n");
+            fprintf(stderr, "  Expected: 0x%04x\n", ntohs(original_checksum));
+            fprintf(stderr, "  Calculated: 0x%04x\n", ntohs(calculated_checksum));
+            fprintf(stderr, "  Packet MUST be dropped per RFC 7348\n");
+            return -1; /* MUST drop packet */
+        }
+        
+        /* RFC 7348: If verification succeeds, MUST be accepted */
+        return 0;
+    }
+    
+    /* Checksum verification disabled - accept non-zero checksum without validation */
     return 0;
+
 }
+
 
 /**
  * Parse VXLAN header and extract VNI
@@ -165,7 +250,8 @@ int vxlan_decapsulate(vxlan_ctx_t *ctx,
     
     /* 3. Parse and Validate Outer UDP Header */
     const udp_hdr_t *outer_udp = (const udp_hdr_t *)(pkt + offset);
-    if (validate_udp_header(outer_udp, remaining, ctx->vtep.udp_port) != 0) {
+    if (validate_udp_header(outer_udp, outer_ip, remaining, 
+                           ctx->vtep.udp_port, ctx->vtep.checksum_enabled) != 0) {
         fprintf(stderr, "Invalid outer UDP header\n");
         return -1;
     }
