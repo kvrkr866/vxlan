@@ -476,6 +476,35 @@ int evpn_rib_add(evpn_ctx_t *ctx, evpn_rib_entry_t *route);
 int evpn_rib_remove(evpn_ctx_t *ctx, evpn_route_type_t type, const uint8_t *mac, uint32_t vni);
 
 /**
+ * Lookup MAC in RIB
+ * 
+ * @param ctx  EVPN context
+ * @param mac  MAC address to lookup
+ * @param vni  VNI
+ * @return     RIB entry if found, NULL otherwise
+ */
+evpn_rib_entry_t *evpn_rib_lookup_mac(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni);
+
+/**
+ * Lookup inclusive multicast route in RIB
+ * 
+ * @param ctx  EVPN context
+ * @param vni  VNI
+ * @return     RIB entry if found, NULL otherwise
+ */
+evpn_rib_entry_t *evpn_rib_lookup_inclusive_mcast(evpn_ctx_t *ctx, uint32_t vni);
+
+/**
+ * Get RIB statistics
+ * 
+ * @param ctx    EVPN context
+ * @param total  Total routes
+ * @param type2  Type 2 routes
+ * @param type3  Type 3 routes
+ */
+void evpn_rib_get_stats(evpn_ctx_t *ctx, int *total, int *type2, int *type3);
+
+/**
  * Dump Ethernet Segments (debugging)
  * 
  * @param ctx  EVPN context
