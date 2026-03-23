@@ -1,7 +1,7 @@
 
 /*****************************************************************************
  * Project     : EVPN Protocol Implementation (RFC 8365)
- * Description : Mass Withdrawal Demo (WEEK 4 Feature 2)
+ * Description : Mass Withdrawal Demo (Feature 2)
  *                
  * Author      : RK (kvrkr866@gmail.com)
  * File name   : mass_withdrawal_demo.c  
@@ -34,7 +34,7 @@ int main() {
     printf("\n");
     printf(ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║         EVPN Mass Withdrawal Demo (Week 4.2)                 ║\n");
+    printf("║         EVPN Mass Withdrawal Demo                             ║\n");
     printf("║                                                               ║\n");
     printf("║  Demonstrates:                                                ║\n");
     printf("║    • Fast convergence on ES failure                           ║\n");
@@ -291,7 +291,7 @@ int main() {
     printf("   to that ES, a mass withdraw mechanism is used for fast\n");
     printf("   convergence and efficient route withdrawal.\"\n");
     
-    printf("\n" ANSI_YELLOW "NEXT STEPS (Week 4 Remaining):" ANSI_RESET "\n");
+    printf("\n" ANSI_YELLOW "NEXT STEPS :" ANSI_RESET "\n");
     printf("  • Feature 3: Aliasing Support (multiple paths per MAC)\n");
     printf("  • Feature 4: Local Bias (traffic optimization)\n");
     

@@ -408,7 +408,7 @@ bool evpn_multihome_local_bias(evpn_ctx_t *ctx, const evpn_esi_t *esi,
                                const uint8_t *dst_mac);
 
 /* ============================================================
- * Single-Active Multi-homing (WEEK 4)
+ * Single-Active Multi-homing 
  * ============================================================ */
 
 /**
@@ -540,7 +540,7 @@ int evpn_single_active_get_status(evpn_ctx_t *ctx, const evpn_esi_t *esi,
 
 
 /* ============================================================
- * Aliasing Support (WEEK 4 Feature 3)
+ * Aliasing Support (Feature 3)
  * RFC 7432 Section 8.4 - Aliasing and Backup Path
  * ============================================================ */
 
@@ -782,7 +782,7 @@ void evpn_dump_segments(evpn_ctx_t *ctx, const evpn_esi_t *esi);
 void evpn_esi_to_string(const evpn_esi_t *esi, char *buf, size_t buf_size);
 
 /* ============================================================
- * Mass Withdrawal (WEEK 4 Feature 2)
+ * Mass Withdrawal (Feature 2)
  * RFC 7432 Section 8.5 - Fast Convergence
  * ============================================================ */
 
@@ -911,7 +911,7 @@ int evpn_get_mass_withdrawal_stats(evpn_ctx_t *ctx, const evpn_esi_t *esi,
 
 
 /* ============================================================
- * Local Bias (WEEK 4 Feature 4)
+ * Local Bias (Feature 4)
  * Traffic Optimization
  * ============================================================ */
 

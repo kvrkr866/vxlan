@@ -1,7 +1,7 @@
 
 /*****************************************************************************
  * Project     : EVPN Protocol Implementation (RFC 8365)
- * Description : Aliasing Support Demo (WEEK 4 Feature 3)
+ * Description : Aliasing Support Demo (Feature 3)
  * Author      : RK (kvrkr866@gmail.com)
  * File name   : aliasing_demo.c  
  * Purpose     : Demonstrates aliasing and per-flow load balancing
@@ -28,7 +28,7 @@ void print_separator() {
 int main() {
     printf("\n" ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║          EVPN Aliasing Support Demo (Week 4.3)               ║\n");
+    printf("║          EVPN Aliasing Support Demo                           ║\n");
     printf("║  RFC 7432 Section 8.4 - Multiple Paths & Load Balancing      ║\n");
     printf("╚═══════════════════════════════════════════════════════════════╝\n");
     printf(ANSI_RESET);

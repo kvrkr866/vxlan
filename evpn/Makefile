@@ -36,7 +36,7 @@ LIBRARY = libevpn.a
 
 
 # Tests
-TESTS = $(BIN_DIR)/test_evpn_basics $(BIN_DIR)/bgp_session_demo $(BIN_DIR)/mac_learning_demo $(BIN_DIR)/multihoming_demo $(BIN_DIR)/single_active_demo $(BIN_DIR)/mass_withdrawal_demo $(BIN_DIR)/aliasing_demo
+TESTS = $(BIN_DIR)/test_evpn_basics $(BIN_DIR)/bgp_session_demo $(BIN_DIR)/mac_learning_demo $(BIN_DIR)/multihoming_demo $(BIN_DIR)/single_active_demo $(BIN_DIR)/mass_withdrawal_demo $(BIN_DIR)/aliasing_demo $(BIN_DIR)/l3_features_demo
 
 # Default target
 all: $(LIBRARY) tests
@@ -52,7 +52,7 @@ $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo "Compiling: $<"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-tests: $(LIBRARY) $(TEST_DIR)/bgp_session_demo.c $(TEST_DIR)/mac_learning_demo.c $(TEST_DIR)/multihoming_demo.c $(TEST_DIR)/test_evpn_basics.c $(TEST_DIR)/single_active_demo.c $(TEST_DIR)/mass_withdrawal_demo.c $(TEST_DIR)/aliasing_demo.c
+tests: $(LIBRARY) $(TEST_DIR)/bgp_session_demo.c $(TEST_DIR)/mac_learning_demo.c $(TEST_DIR)/multihoming_demo.c $(TEST_DIR)/test_evpn_basics.c $(TEST_DIR)/single_active_demo.c $(TEST_DIR)/mass_withdrawal_demo.c $(TEST_DIR)/aliasing_demo.c $(TEST_DIR)/l3_features_demo.c
 	@echo "Building tests: $@"
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/bgp_session_demo.c  -L. -levpn $(LDFLAGS) -o $(BIN_DIR)/bgp_session_demo
@@ -62,6 +62,7 @@ tests: $(LIBRARY) $(TEST_DIR)/bgp_session_demo.c $(TEST_DIR)/mac_learning_demo.c
 	$(CC) $(CFLAGS) $(TEST_DIR)/single_active_demo.c  -L. -levpn $(LDFLAGS) -o $(BIN_DIR)/single_active_demo
 	$(CC) $(CFLAGS) $(TEST_DIR)/mass_withdrawal_demo.c  -L. -levpn $(LDFLAGS) -o $(BIN_DIR)/mass_withdrawal_demo
 	$(CC) $(CFLAGS) $(TEST_DIR)/aliasing_demo.c  -L. -levpn $(LDFLAGS) -o $(BIN_DIR)/aliasing_demo
+	$(CC) $(CFLAGS) $(TEST_DIR)/l3_features_demo.c  -L. -levpn $(LDFLAGS) -o $(BIN_DIR)/l3_features_demo
 	@echo "✓ demo and test binaries built successfully"
 
 

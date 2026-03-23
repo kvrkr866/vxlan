@@ -760,7 +760,7 @@ void evpn_dump_segments(evpn_ctx_t *ctx, const evpn_esi_t *esi) {
 }
 
 /* ============================================================
- * Single-Active Multi-homing (WEEK 4)
+ * Single-Active Multi-homing 
  * RFC 7432 Section 8.4 - Single-Active Redundancy Mode
  * ============================================================ */
 
@@ -1047,7 +1047,7 @@ int evpn_transition_to_single_active(evpn_ctx_t *ctx, const evpn_esi_t *esi) {
     // Step 3: If we are not active PE, withdraw our MAC routes
     if (!evpn_am_i_active_pe(ctx, esi)) {
         printf("      Step 3: We are standby - would withdraw MAC routes here\n");
-        // TODO Week 4.2: Implement MAC route withdrawal
+        // TODO : Implement MAC route withdrawal
     } else {
         printf("      Step 3: We are active - keeping MAC routes\n");
     }
@@ -1109,7 +1109,7 @@ int evpn_single_active_get_status(evpn_ctx_t *ctx, const evpn_esi_t *esi,
 }
 
 /* ============================================================
- * Mass Withdrawal (WEEK 4 Feature 2)
+ * Mass Withdrawal (Feature 2)
  * RFC 7432 Section 8.5 - Fast Convergence
  * ============================================================ */
 
@@ -1459,7 +1459,7 @@ int evpn_get_mass_withdrawal_stats(evpn_ctx_t *ctx, const evpn_esi_t *esi,
 }
 
 /* ============================================================
- * Aliasing Support (WEEK 4 Feature 3)
+ * Aliasing Support (Feature 3)
  * RFC 7432 Section 8.4 - Aliasing and Backup Path
  * ============================================================ */
 
@@ -1732,7 +1732,7 @@ int evpn_get_aliasing_stats(evpn_ctx_t *ctx, const evpn_esi_t *esi,
 }
 
 /* ============================================================
- * Local Bias (WEEK 4 Feature 4)
+ * Local Bias (Feature 4)
  * Traffic Optimization
  * ============================================================ */
 

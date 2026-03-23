@@ -39,7 +39,7 @@ int main() {
     printf("\n");
     printf(ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║       EVPN Multi-homing Demonstration (Week 3)                ║\n");
+    printf("║       EVPN Multi-homing Demonstration                         ║\n");
     printf("║                                                               ║\n");
     printf("║  Demonstrates:                                                ║\n");
     printf("║    • Ethernet Segments (ES)                                   ║\n");
@@ -294,10 +294,10 @@ int main() {
     printf("  • Loop Prevention: Split-horizon avoids L2 loops\n");
     printf("  • No Duplication: DF election prevents BUM duplication\n");
     
-    printf("\n" ANSI_YELLOW "INTEGRATION WITH WEEKS 1-2:" ANSI_RESET "\n");
-    printf("  • Week 1: BGP sessions carry multi-homing routes\n");
-    printf("  • Week 2: MACs learned with ESI for multi-homing\n");
-    printf("  • Week 3: ES provides redundancy and load balancing\n");
+    printf("\n" ANSI_YELLOW "INTEGRATION :" ANSI_RESET "\n");
+    printf("  •  1: BGP sessions carry multi-homing routes\n");
+    printf("  •  2: MACs learned with ESI for multi-homing\n");
+    printf("  •  3: ES provides redundancy and load balancing\n");
     
     print_separator();
     

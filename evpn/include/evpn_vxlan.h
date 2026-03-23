@@ -34,7 +34,7 @@ typedef struct {
 } vxlan_mac_entry_t;
 
 /* ============================================================
- * Core Integration Functions (CRITICAL for Week 2)
+ * Core Integration Functions 
  * ============================================================ */
 
 /**

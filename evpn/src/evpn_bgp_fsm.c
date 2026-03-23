@@ -230,7 +230,7 @@ static void *bgp_peer_thread(void *arg) {
                         break;
                         
                     case BGP_MSG_UPDATE:
-                        /* Process UPDATE (Week 2 will implement full processing) */
+                        /* Process UPDATE (this will implement full processing) */
                         printf("BGP: Received UPDATE message (%zu bytes)\n", len);
                         bgp_fsm_process(conn, BGP_EVENT_UPDATE_RECEIVED);
                         break;

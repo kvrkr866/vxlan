@@ -94,8 +94,8 @@ int main(int argc, char *argv[]) {
     printf("\n");
     printf(ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║          EVPN BGP Session Establishment Test                 ║\n");
-    printf("║                   RFC 8365 Week 1                             ║\n");
+    printf("║          EVPN BGP Session Establishment Test                  ║\n");
+    printf("║                   RFC 8365                                    ║\n");
     printf("╚═══════════════════════════════════════════════════════════════╝\n");
     printf(ANSI_RESET "\n");
     

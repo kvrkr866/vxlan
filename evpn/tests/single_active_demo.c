@@ -1,7 +1,7 @@
 
 /*****************************************************************************
  * Project     : EVPN Protocol Implementation (RFC 8365)
- * Description : Single-Active Multi-homing Demo (WEEK 4 Feature 1)
+ * Description : Single-Active Multi-homing Demo (Feature 1)
  *                
  * Author      : RK (kvrkr866@gmail.com)
  * File name   : single_active_demo.c  
@@ -34,7 +34,7 @@ int main() {
     printf("\n");
     printf(ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║     EVPN Single-Active Multi-homing Demo (Week 4.1)          ║\n");
+    printf("║     EVPN Single-Active Multi-homing Demo                      ║\n");
     printf("║                                                               ║\n");
     printf("║  Demonstrates:                                                ║\n");
     printf("║    • Single-Active vs All-Active modes                        ║\n");
@@ -285,7 +285,7 @@ int main() {
     printf("  • Simplified network topologies\n");
     printf("  • Active/Standby DR scenarios\n");
     
-    printf("\n" ANSI_YELLOW "NEXT STEPS (Week 4 Remaining):" ANSI_RESET "\n");
+    printf("\n" ANSI_YELLOW "NEXT STEPS  :" ANSI_RESET "\n");
     printf("  • Feature 2: Mass Withdrawal (fast convergence)\n");
     printf("  • Feature 3: Aliasing Support (multiple paths)\n");
     printf("  • Feature 4: Local Bias (traffic optimization)\n");

@@ -317,7 +317,7 @@ int evpn_advertise_mac_ip(evpn_ctx_t *ctx, const uint8_t *mac,
     
     memcpy(&route.rd, &vrf->rd, sizeof(evpn_rd_t));
     
-    // Zero ESI for single-homing (Week 3 will add multi-homing)
+    // Zero ESI for single-homing (add multi-homing)
     memset(&route.esi, 0, sizeof(evpn_esi_t));
     
     route.ethernet_tag = 0;  // Single broadcast domain
@@ -1025,7 +1025,7 @@ int evpn_process_nlri(evpn_ctx_t *ctx, const uint8_t *nlri, size_t nlri_len,
         }
         
         case EVPN_ROUTE_TYPE_IP_PREFIX:
-            printf("EVPN: Route type 5 (IP Prefix) not implemented yet (Week 5)\n");
+            printf("EVPN: Route type 5 (IP Prefix) not implemented yet \n");
             return 0;
         
         default:
@@ -1034,4 +1034,649 @@ int evpn_process_nlri(evpn_ctx_t *ctx, const uint8_t *nlri, size_t nlri_len,
     }
     
     return -1;
+}
+
+/* ============================================================
+ * Type 5 Routes - IP Prefix Route (Feature 1)
+ * RFC 9136 - IP Prefix Advertisement in EVPN
+ * ============================================================ */
+
+/**
+ * Encode Type 5 route to BGP NLRI format
+ */
+int evpn_encode_type5_route(const evpn_ip_prefix_route_t *route,
+                            uint8_t *buf, size_t buf_size, size_t *len) {
+    if (!route || !buf || buf_size < EVPN_TYPE5_MIN_LENGTH || !len) {
+        return -1;
+    }
+    
+    uint8_t *ptr = buf;
+    
+    // Route Type
+    *ptr++ = EVPN_ROUTE_TYPE_IP_PREFIX;
+    
+    // Length (will be filled at end)
+    uint8_t *len_ptr = ptr++;
+    
+    // RD (8 bytes)
+    memcpy(ptr, &route->rd, sizeof(evpn_rd_t));
+    ptr += sizeof(evpn_rd_t);
+    
+    // ESI (10 bytes)
+    memcpy(ptr, &route->esi, EVPN_ESI_LENGTH);
+    ptr += EVPN_ESI_LENGTH;
+    
+    // Ethernet Tag ID (4 bytes)
+    uint32_t eth_tag = htonl(route->ethernet_tag);
+    memcpy(ptr, &eth_tag, 4);
+    ptr += 4;
+    
+    // IP Prefix Length (1 byte)
+    *ptr++ = route->ip_prefix_len;
+    
+    // IP Prefix (4 bytes)
+    memcpy(ptr, &route->ip_prefix, 4);
+    ptr += 4;
+    
+    // Gateway IP (4 bytes)
+    memcpy(ptr, &route->gw_ip, 4);
+    ptr += 4;
+    
+    // Label/VNI (3 bytes)
+    uint32_t label_be = htonl(route->label << 12);
+    memcpy(ptr, &label_be, 3);
+    ptr += 3;
+    
+    // Fill in length
+    *len_ptr = (uint8_t)(ptr - buf - 2);
+    *len = ptr - buf;
+    
+    return 0;
+}
+
+/**
+ * Decode Type 5 route from BGP NLRI
+ */
+int evpn_decode_type5_route(const uint8_t *nlri, size_t nlri_len,
+                            evpn_ip_prefix_route_t *route) {
+    if (!nlri || nlri_len < EVPN_TYPE5_MIN_LENGTH || !route) {
+        return -1;
+    }
+    
+    const uint8_t *ptr = nlri;
+    
+    // Skip route type and length
+    ptr += 2;
+    
+    // RD
+    memcpy(&route->rd, ptr, sizeof(evpn_rd_t));
+    ptr += sizeof(evpn_rd_t);
+    
+    // ESI
+    memcpy(&route->esi, ptr, EVPN_ESI_LENGTH);
+    ptr += EVPN_ESI_LENGTH;
+    
+    // Ethernet Tag
+    uint32_t eth_tag;
+    memcpy(&eth_tag, ptr, 4);
+    route->ethernet_tag = ntohl(eth_tag);
+    ptr += 4;
+    
+    // IP Prefix Length
+    route->ip_prefix_len = *ptr++;
+    
+    // IP Prefix
+    memcpy(&route->ip_prefix, ptr, 4);
+    ptr += 4;
+    
+    // Gateway IP
+    memcpy(&route->gw_ip, ptr, 4);
+    ptr += 4;
+    
+    // Label
+    uint32_t label_be = 0;
+    memcpy(&label_be, ptr, 3);
+    route->label = ntohl(label_be << 8) >> 12;
+    
+    return 0;
+}
+
+/**
+ * Advertise IP prefix via Type 5 route
+ */
+int evpn_advertise_ip_prefix(evpn_ctx_t *ctx, uint32_t ip_prefix,
+                             uint8_t prefix_len, uint32_t gw_ip, uint32_t vni) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    // Build Type 5 route
+    evpn_ip_prefix_route_t route;
+    memset(&route, 0, sizeof(route));
+    
+    // Set RD (simplified - using router ID)
+    route.rd.type = 0;
+    route.rd.value.asn_based.asn = ctx->local_asn;
+    route.rd.value.asn_based.number = vni;
+    
+    // ESI = 0 (not multi-homed for now)
+    memset(&route.esi, 0, sizeof(route.esi));
+    
+    route.ethernet_tag = 0;
+    route.ip_prefix = ip_prefix;
+    route.ip_prefix_len = prefix_len;
+    route.gw_ip = gw_ip;
+    route.label = vni;
+    
+    // Encode to NLRI
+    uint8_t nlri[EVPN_NLRI_MAX_SIZE];
+    size_t nlri_len;
+    
+    if (evpn_encode_type5_route(&route, nlri, sizeof(nlri), &nlri_len) != 0) {
+        fprintf(stderr, "Failed to encode Type 5 route\n");
+        return -1;
+    }
+    
+    char ip_str[32];
+    struct in_addr addr;
+    addr.s_addr = ip_prefix;
+    snprintf(ip_str, sizeof(ip_str), "%s/%d", inet_ntoa(addr), prefix_len);
+    
+    printf("EVPN: Advertising IP prefix %s (VNI %u)\n", ip_str, vni);
+    printf("      Gateway: ");
+    addr.s_addr = gw_ip;
+    printf("%s\n", inet_ntoa(addr));
+    
+    // In real implementation: send via BGP
+    // evpn_send_update_to_peers(ctx, nlri, nlri_len, gw_ip);
+    
+    return 0;
+}
+
+/**
+ * Withdraw IP prefix
+ */
+int evpn_withdraw_ip_prefix(evpn_ctx_t *ctx, uint32_t ip_prefix,
+                            uint8_t prefix_len, uint32_t vni) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    char ip_str[32];
+    struct in_addr addr;
+    addr.s_addr = ip_prefix;
+    snprintf(ip_str, sizeof(ip_str), "%s/%d", inet_ntoa(addr), prefix_len);
+    
+    printf("EVPN: Withdrawing IP prefix %s (VNI %u)\n", ip_str, vni);
+    
+    return 0;
+}
+
+/**
+ * Process received Type 5 route
+ */
+int evpn_process_ip_prefix_route(evpn_ctx_t *ctx,
+                                 const evpn_ip_prefix_route_t *route,
+                                 uint32_t next_hop, bool withdraw) {
+    if (!ctx || !route) {
+        return -1;
+    }
+    
+    char ip_str[32];
+    struct in_addr addr;
+    addr.s_addr = route->ip_prefix;
+    snprintf(ip_str, sizeof(ip_str), "%s/%d", inet_ntoa(addr), route->ip_prefix_len);
+    
+    if (withdraw) {
+        printf("EVPN: Received Type 5 withdrawal: %s\n", ip_str);
+        return evpn_remove_ip_route(ctx, route->ip_prefix, route->ip_prefix_len, route->label);
+    } else {
+        printf("EVPN: Received Type 5 route: %s via ", ip_str);
+        addr.s_addr = next_hop;
+        printf("%s (VNI %u)\n", inet_ntoa(addr), route->label);
+        return evpn_install_ip_route(ctx, route->ip_prefix, route->ip_prefix_len, next_hop, route->label);
+    }
+}
+
+/**
+ * Install IP prefix route in routing table
+ */
+int evpn_install_ip_route(evpn_ctx_t *ctx, uint32_t ip_prefix,
+                          uint8_t prefix_len, uint32_t next_hop, uint32_t vni) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    // In real implementation: install in kernel routing table
+    // ip route add <prefix> via <next_hop> dev vxlan<vni>
+    
+    char ip_str[32];
+    struct in_addr addr;
+    addr.s_addr = ip_prefix;
+    snprintf(ip_str, sizeof(ip_str), "%s/%d", inet_ntoa(addr), prefix_len);
+    
+    printf("      → Installing route: %s via ", ip_str);
+    addr.s_addr = next_hop;
+    printf("%s (VNI %u)\n", inet_ntoa(addr), vni);
+    
+    return 0;
+}
+
+/**
+ * Remove IP prefix route from routing table
+ */
+int evpn_remove_ip_route(evpn_ctx_t *ctx, uint32_t ip_prefix,
+                        uint8_t prefix_len, uint32_t vni) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    char ip_str[32];
+    struct in_addr addr;
+    addr.s_addr = ip_prefix;
+    snprintf(ip_str, sizeof(ip_str), "%s/%d", inet_ntoa(addr), prefix_len);
+    
+    printf("      → Removing route: %s (VNI %u)\n", ip_str, vni);
+    
+    return 0;
+}
+
+/* ============================================================
+ * MAC Mobility (Feature 2)
+ * RFC 7432 Section 15 - MAC Mobility
+ * ============================================================ */
+
+// Simple MAC mobility table (in real implementation: hash table)
+typedef struct {
+    uint8_t mac[6];
+    uint32_t vni;
+    uint32_t vtep_ip;
+    uint32_t sequence;
+    time_t last_move;
+    int move_count;
+} mac_mobility_entry_t;
+
+static mac_mobility_entry_t mac_mobility_table[256];
+static int mac_mobility_count = 0;
+
+/**
+ * Find MAC mobility entry
+ */
+static mac_mobility_entry_t* find_mac_mobility(const uint8_t *mac, uint32_t vni) {
+    for (int i = 0; i < mac_mobility_count; i++) {
+        if (memcmp(mac_mobility_table[i].mac, mac, 6) == 0 &&
+            mac_mobility_table[i].vni == vni) {
+            return &mac_mobility_table[i];
+        }
+    }
+    return NULL;
+}
+
+/**
+ * Advertise MAC with mobility sequence number
+ */
+int evpn_advertise_mac_with_seq(evpn_ctx_t *ctx, const uint8_t *mac,
+                                uint32_t ip, uint32_t vni, uint32_t seq) {
+    if (!ctx || !mac) {
+        return -1;
+    }
+    
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
+    printf("EVPN: Advertising MAC %s with sequence %u (VNI %u)\n",
+           mac_str, seq, vni);
+    
+    // In real implementation: add MAC Mobility extended community to BGP UPDATE
+    
+    return 0;
+}
+
+/**
+ * Detect MAC mobility
+ */
+bool evpn_detect_mac_move(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni,
+                         uint32_t new_vtep, uint32_t *old_vtep) {
+    if (!ctx || !mac) {
+        return false;
+    }
+    
+    mac_mobility_entry_t *entry = find_mac_mobility(mac, vni);
+    
+    if (!entry) {
+        // First time seeing this MAC
+        if (mac_mobility_count < 256) {
+            entry = &mac_mobility_table[mac_mobility_count++];
+            memcpy(entry->mac, mac, 6);
+            entry->vni = vni;
+            entry->vtep_ip = new_vtep;
+            entry->sequence = 0;
+            entry->last_move = time(NULL);
+            entry->move_count = 0;
+        }
+        return false;
+    }
+    
+    // Check if MAC moved
+    if (entry->vtep_ip != new_vtep) {
+        if (old_vtep) {
+            *old_vtep = entry->vtep_ip;
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Handle MAC mobility event
+ */
+int evpn_handle_mac_move(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni,
+                        uint32_t old_vtep, uint32_t new_vtep) {
+    if (!ctx || !mac) {
+        return -1;
+    }
+    
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
+    printf("\n");
+    printf("╔═══════════════════════════════════════════════════════════════╗\n");
+    printf("║              MAC MOBILITY DETECTED                            ║\n");
+    printf("╚═══════════════════════════════════════════════════════════════╝\n");
+    printf("MAC: %s\n", mac_str);
+    printf("VNI: %u\n", vni);
+    
+    struct in_addr addr;
+    addr.s_addr = old_vtep;
+    printf("Old VTEP: %s\n", inet_ntoa(addr));
+    
+    addr.s_addr = new_vtep;
+    printf("New VTEP: %s\n", inet_ntoa(addr));
+    
+    // Update mobility entry
+    mac_mobility_entry_t *entry = find_mac_mobility(mac, vni);
+    if (entry) {
+        entry->vtep_ip = new_vtep;
+        entry->sequence++;
+        entry->move_count++;
+        entry->last_move = time(NULL);
+        
+        printf("Sequence: %u\n", entry->sequence);
+        printf("Move count: %d\n", entry->move_count);
+        
+        // Check for excessive moves (possible loop)
+        if (entry->move_count > 5) {
+            printf("\n⚠ WARNING: Excessive MAC moves detected!\n");
+            printf("  Possible loop or misconfiguration\n");
+            printf("  Consider marking MAC as sticky\n");
+        }
+    }
+    
+    printf("═══════════════════════════════════════════════════════════════\n\n");
+    
+    // Re-advertise with new sequence number
+    evpn_advertise_mac_with_seq(ctx, mac, 0, vni, entry ? entry->sequence : 0);
+    
+    return 0;
+}
+
+/**
+ * Get MAC mobility sequence number
+ */
+uint32_t evpn_get_mac_sequence(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni) {
+    if (!ctx || !mac) {
+        return 0;
+    }
+    
+    mac_mobility_entry_t *entry = find_mac_mobility(mac, vni);
+    return entry ? entry->sequence : 0;
+}
+
+/**
+ * Increment MAC mobility sequence
+ */
+uint32_t evpn_increment_mac_sequence(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni) {
+    if (!ctx || !mac) {
+        return 0;
+    }
+    
+    mac_mobility_entry_t *entry = find_mac_mobility(mac, vni);
+    if (entry) {
+        entry->sequence++;
+        return entry->sequence;
+    }
+    
+    return 0;
+}
+
+/**
+ * Check if MAC move should be allowed
+ */
+bool evpn_should_allow_mac_move(evpn_ctx_t *ctx, const uint8_t *mac, uint32_t vni,
+                               uint32_t old_seq, uint32_t new_seq) {
+    if (!ctx || !mac) {
+        return false;
+    }
+    
+    // Accept if new sequence is higher (normal case)
+    if (new_seq > old_seq) {
+        return true;
+    }
+    
+    // Reject if new sequence is lower (old UPDATE)
+    if (new_seq < old_seq) {
+        printf("      Rejecting MAC move: old sequence (%u < %u)\n", new_seq, old_seq);
+        return false;
+    }
+    
+    // Equal sequence - use tiebreaker (typically router ID)
+    return true;
+}
+
+/* ============================================================
+ * ARP Suppression (Feature 3)
+ * RFC 7432 Section 10 - ARP and ND Extended Community
+ * ============================================================ */
+
+// ARP cache (in real implementation: hash table)
+static evpn_arp_entry_t arp_cache[1024];
+static int arp_cache_count = 0;
+static uint64_t arp_requests_received = 0;
+static uint64_t arp_requests_suppressed = 0;
+
+/**
+ * Enable ARP suppression for a VNI
+ */
+int evpn_enable_arp_suppression(evpn_ctx_t *ctx, uint32_t vni) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    printf("EVPN: Enabled ARP suppression for VNI %u\n", vni);
+    printf("      VTEP will answer ARP requests locally\n");
+    printf("      Reduces ARP flooding in overlay\n");
+    
+    return 0;
+}
+
+/**
+ * Add entry to ARP cache
+ */
+int evpn_arp_cache_add(evpn_ctx_t *ctx, uint32_t ip, const uint8_t *mac, uint32_t vni) {
+    if (!ctx || !mac) {
+        return -1;
+    }
+    
+    // Check if entry exists
+    for (int i = 0; i < arp_cache_count; i++) {
+        if (arp_cache[i].ip == ip && arp_cache[i].vni == vni) {
+            // Update existing entry
+            memcpy(arp_cache[i].mac, mac, 6);
+            arp_cache[i].timestamp = time(NULL);
+            return 0;
+        }
+    }
+    
+    // Add new entry
+    if (arp_cache_count < 1024) {
+        arp_cache[arp_cache_count].ip = ip;
+        memcpy(arp_cache[arp_cache_count].mac, mac, 6);
+        arp_cache[arp_cache_count].vni = vni;
+        arp_cache[arp_cache_count].timestamp = time(NULL);
+        arp_cache_count++;
+        
+        struct in_addr addr;
+        addr.s_addr = ip;
+        char mac_str[18];
+        snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        
+        printf("      ARP cache: %s → %s (VNI %u)\n", inet_ntoa(addr), mac_str, vni);
+    }
+    
+    return 0;
+}
+
+/**
+ * Lookup IP in ARP cache
+ */
+int evpn_arp_cache_lookup(evpn_ctx_t *ctx, uint32_t ip, uint32_t vni,
+                          uint8_t *mac_out) {
+    if (!ctx || !mac_out) {
+        return -1;
+    }
+    
+    for (int i = 0; i < arp_cache_count; i++) {
+        if (arp_cache[i].ip == ip && arp_cache[i].vni == vni) {
+            memcpy(mac_out, arp_cache[i].mac, 6);
+            return 0;
+        }
+    }
+    
+    return -1;  // Not found
+}
+
+/**
+ * Handle ARP request (suppress if we can answer)
+ */
+bool evpn_handle_arp_request(evpn_ctx_t *ctx, uint32_t target_ip, uint32_t vni,
+                            uint8_t *reply_mac) {
+    if (!ctx) {
+        return false;
+    }
+    
+    arp_requests_received++;
+    
+    // Lookup in ARP cache
+    if (evpn_arp_cache_lookup(ctx, target_ip, vni, reply_mac) == 0) {
+        arp_requests_suppressed++;
+        
+        struct in_addr addr;
+        addr.s_addr = target_ip;
+        char mac_str[18];
+        snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                 reply_mac[0], reply_mac[1], reply_mac[2], reply_mac[3], reply_mac[4], reply_mac[5]);
+        
+        printf("      ARP suppression: Who has %s? → %s (cached)\n",
+               inet_ntoa(addr), mac_str);
+        
+        return true;  // Suppressed
+    }
+    
+    return false;  // Not in cache, allow flooding
+}
+
+/**
+ * Generate ARP reply locally
+ */
+int evpn_generate_arp_reply(evpn_ctx_t *ctx, uint32_t src_ip, const uint8_t *src_mac,
+                           uint32_t target_ip, const uint8_t *target_mac,
+                           uint8_t *reply, size_t *reply_len) {
+    if (!ctx || !src_mac || !target_mac || !reply || !reply_len) {
+        return -1;
+    }
+    
+    // In real implementation: construct ARP reply packet
+    // For now, just simulate
+    
+    *reply_len = 42;  // Typical ARP reply size
+    
+    printf("      Generated ARP reply for ");
+    struct in_addr addr;
+    addr.s_addr = target_ip;
+    printf("%s\n", inet_ntoa(addr));
+    
+    return 0;
+}
+
+/**
+ * Get ARP suppression statistics
+ */
+int evpn_get_arp_stats(evpn_ctx_t *ctx, uint32_t vni,
+                      uint64_t *requests_received,
+                      uint64_t *requests_suppressed,
+                      uint64_t *cache_entries) {
+    if (!ctx) {
+        return -1;
+    }
+    
+    if (requests_received) {
+        *requests_received = arp_requests_received;
+    }
+    
+    if (requests_suppressed) {
+        *requests_suppressed = arp_requests_suppressed;
+    }
+    
+    if (cache_entries) {
+        *cache_entries = arp_cache_count;
+    }
+    
+    return 0;
+}
+
+/* ============================================================
+ * Route Policies (Feature 4)
+ * Import/Export Filtering
+ * ============================================================ */
+
+static evpn_route_policy_t import_policies[16];
+static int import_policy_count = 0;
+static evpn_route_policy_t export_policies[16];
+static int export_policy_count = 0;
+
+/**
+ * Create route policy
+ */
+int evpn_create_policy(evpn_ctx_t *ctx, const char *name,
+                       evpn_policy_action_t action) {
+    if (!ctx || !name) {
+        return -1;
+    }
+    
+    printf("EVPN: Created route policy '%s' (%s)\n",
+           name, action == EVPN_POLICY_PERMIT ? "PERMIT" : "DENY");
+    
+    return 0;
+}
+
+/**
+ * Apply import policy
+ */
+bool evpn_apply_import_policy(evpn_ctx_t *ctx, evpn_route_type_t type,
+                              uint32_t vni) {
+    // Default: permit all
+    return true;
+}
+
+/**
+ * Apply export policy
+ */
+bool evpn_apply_export_policy(evpn_ctx_t *ctx, evpn_route_type_t type,
+                              uint32_t vni) {
+    // Default: permit all
+    return true;
 }

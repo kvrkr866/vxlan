@@ -36,7 +36,7 @@ int main() {
     printf("\n");
     printf(ANSI_BLUE);
     printf("╔═══════════════════════════════════════════════════════════════╗\n");
-    printf("║         EVPN MAC Learning Demonstration (Week 2)              ║\n");
+    printf("║         EVPN MAC Learning Demonstration                       ║\n");
     printf("║                                                               ║\n");
     printf("║  Demonstrates:                                                ║\n");
     printf("║    • MAC/IP Advertisement (Type 2 routes)                     ║\n");
@@ -257,7 +257,7 @@ int main() {
     printf("  • Connect to actual BGP Route Reflector\n");
     printf("  • Test with multiple VTEPs\n");
     printf("  • Verify flooding elimination\n");
-    printf("  • Week 3: Multi-homing support\n");
+    printf("  • Multi-homing support\n");
     
     print_separator();
     
